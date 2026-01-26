@@ -1,104 +1,95 @@
-# AgenticRAG
+# AgentForce
 
-**AgenticRAG** 是一个结合了 **GraphRAG（基于图的检索增强生成）** 技术与 **Agentic Workflow（代理工作流）** 的智能对话系统。该项目旨在提供一个高度可配置、支持多模态文档知识库构建以及深度问答的解决方案。
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.95%2B-009688)](https://fastapi.tiangolo.com/)
+[![GraphRAG](https://img.shields.io/badge/RAG-GraphRAG-purple)](https://github.com/)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-系统采用前后端分离架构：
-- **Backend**: 基于 FastAPI 的高性能 Python 服务，负责逻辑处理、GraphRAG 管道和 LLM 交互。
-- **Frontend**: 轻量级静态 Web 界面，提供直观的聊天窗口和配置管理面板。
+**AgentForce** 是一个融合了 **GraphRAG（图谱增强检索）** 认知能力与 **Agentic Workflow（代理工作流）** 执行能力的下一代智能对话平台。
 
----
-
-## ✨ 核心功能
-
-### 1. 🧠 智能对话 (Chat Agent)
-- **多轮对话管理**: 支持具有上下文记忆的连续对话。
-- **会话持久化**: 聊天记录自动保存至 `config/saved_history.json`，支持历史回溯。
-- **会话隔离**: 独立的 Session ID 管理，支持创建新会话、清理历史和删除会话。
-
-### 2. 🕸️ GraphRAG 知识库
-不仅仅是向量检索，而是基于图谱的深度理解：
-- **文档管理**: 支持上传 PDF, DOCX, TXT, MD, CSV 等多种格式文件。
-- **自动化索引**: 文件上传后，后台自动触发实体提取、关系构建和社区检测（Community Detection）。
-- **全局查询 (Global Query)**: 基于生成的社区摘要回答概括性问题，而非仅限于局部片段匹配。
-- **状态监控**: 实时查看文档数、实体数、关系数及索引状态。
-
-### 3. ⚙️ 动态配置系统
-无需重启服务即可调整核心参数：
-- **LLM 设置**: 动态切换模型（如 GPT-4o, Claude-3.5）、API Key 和 API URL。
-- **搜索增强**: 集成 Tavily Search 配置。
-- **爬虫配置**: 集成 Firecrawl 用于网页知识获取。
-- **配置持久化**: 所有设置保存至 `config/saved_config.json`。
+不同于传统的 RAG 系统，AgentForce 不仅能“检索”片段，更能通过构建知识图谱“理解”全貌，并通过自主代理规划“执行”复杂任务。系统采用现代化的前后端分离架构，旨在为开发者提供开箱即用的深度问答与知识库构建解决方案。
 
 ---
 
-## 📂 项目结构
+## ✨ 核心特性
+
+### 1. ⚡️ Agentic Workflow (代理工作流)
+超越简单的问答，AgentForce 具备自主规划能力：
+- **动态规划**: Agent 根据问题复杂度，自动判断是否需要查阅知识库、联网搜索或进行多步推理。
+- **记忆增强**: 内置会话持久化机制 (`saved_history.json`)，支持跨周期的长程记忆与上下文理解。
+- **会话隔离**: 完备的 Session 管理体系，支持多用户、多会话并行处理。
+
+### 2. 🕸️ Graph-Powered Knowledge (图谱认知)
+基于 GraphRAG 技术，从碎片化信息中重构知识网络：
+- **深度理解**: 自动提取实体 (Entities)、构建关系 (Relationships) 并生成社区摘要 (Community Summaries)。
+- **全局查询 (Global Query)**: 能够回答 "总结这几份文档的主要冲突点" 等宏观问题，这是传统向量检索无法做到的。
+- **多模态支持**: 支持 PDF, DOCX, TXT, MD, CSV 等多种格式的即时索引与可视化状态监控。
+
+### 3. 🎛️ Dynamic Control (动态中枢)
+全热更新配置，无需重启服务：
+- **模型热切换**: 随时在 GPT-4o, Claude-3.5 或本地模型间切换。
+- **工具链集成**: 一键配置 Tavily (联网搜索) 和 Firecrawl (网页爬取) 等外部工具。
+- **持久化配置**: 所有系统参数自动保存至 `config/saved_config.json`，确保配置不丢失。
+
+---
+
+## 📂 项目架构
 
 ```text
-AgenticRAG/
-├── config/                  # [配置层]
+AgentForce/
+├── config/                  # [控制中心]
 │   ├── __init__.py
-│   ├── prompts.py           # 提示词模版
-│   ├── saved_config.json    # [自动生成] 用户保存的配置
-│   ├── saved_history.json   # [自动生成] 历史对话记录
-│   └── settings.py          # 全局设置加载器
-├── src/                     # [源码层]
-│   ├── api/                 # API 接口路由
-│   │   ├── main.py          # FastAPI 应用入口
-│   │   ├── routes.py        # 核心路由 (Chat, GraphRAG, Config)
-│   │   └── websocket.py     # 实时通讯处理
-│   ├── models/              # Pydantic 数据模型
-│   ├── services/            # 业务服务逻辑
-│   │   ├── llm_service.py   # LLM 交互封装
-│   │   ├── rag_graph.py     # GraphRAG 核心管道实现
-│   │   └── search_service.py # 联网搜索服务
-│   ├── workflow/            # Agent 工作流引擎
-│   │   ├── agent.py         # 对话代理实现
-│   │   └── nodes.py         # 工作流节点定义
-│   └── __init__.py
-├── static/                  # [前端层] 纯静态文件
-│   ├── chat.js              # 聊天逻辑
-│   ├── config.js            # 设置页面逻辑
-│   ├── index.html           # 主界面
-│   └── knowledge.js         # 知识库管理逻辑
-├── uploads/                 # [数据层] 上传文件临时存储
-├── requirements.txt         # 项目依赖
-├── run.py                   # 后端启动脚本
-└── README.md                # 项目说明文档
+│   ├── prompts.py           # Agent 提示词工程
+│   ├── saved_config.json    # [自动同步] 系统配置存储
+│   ├── saved_history.json   # [自动同步] 对话记忆存储
+│   └── settings.py          # 全局配置加载器
+├── src/                     # [核心引擎]
+│   ├── api/                 # 接口层 (RESTful API & WebSocket)
+│   ├── models/              # 数据模型 (Pydantic Schema)
+│   ├── services/            # 业务服务 (LLM, GraphRAG, Search)
+│   └── workflow/            # 代理大脑 (Agent Nodes & Edges)
+├── static/                  # [交互界面] 轻量级 Web UI
+│   ├── chat.js              # 对话交互逻辑
+│   ├── config.js            # 动态配置逻辑
+│   ├── knowledge.js         # 知识库可视化逻辑
+│   └── index.html           # 应用入口
+├── uploads/                 # [数据缓存] 待处理文件区
+├── requirements.txt         # 依赖清单
+├── run.py                   # 服务启动入口
+└── README.md                # 说明文档
 
 ```
 
 ---
 
-## 🚀 快速开始
+## 🚀 快速启动
 
 ### 1. 环境准备
 
-确保已安装 **Python 3.10+**。
+确保您的环境已安装 **Python 3.10+**。
 
 ```bash
-# 1. 克隆项目
-git clone <repository_url>
-cd AgenticRAG
+# 1. 克隆仓库
+git clone [https://github.com/your-username/AgentForce.git](https://github.com/your-username/AgentForce.git)
+cd AgentForce
 
-# 2. 创建并激活虚拟环境 (推荐)
+# 2. 创建虚拟环境 (建议)
 python -m venv venv
 # Windows:
 venv\Scripts\activate
 # Mac/Linux:
 source venv/bin/activate
 
-# 3. 安装依赖
+# 3. 安装核心依赖
 pip install -r requirements.txt
 
 ```
 
-### 2. 启动服务
+### 2. 启动 AgentForce
 
-本项目需要分别启动后端 API 和前端服务。
+系统由后端 API 和前端 UI 两部分组成。
 
-#### 🟢 启动后端 (Backend)
-
-后端服务负责处理所有 API 请求。
+#### 🟢 启动后端引擎 (Backend)
 
 ```bash
 # 在项目根目录下运行
@@ -106,76 +97,75 @@ python run.py
 
 ```
 
-> *后端服务默认运行在 http://localhost:8000 (具体视 run.py 配置而定)*
+> *后端 API 服务将启动在: http://localhost:8000*
 
-#### 🔵 启动前端 (Frontend)
-
-前端为静态文件，使用 Python 内置 HTTP 服务器运行。
+#### 🔵 启动可视化终端 (Frontend)
 
 ```bash
-# 进入 static 目录
+# 进入静态资源目录
 cd static
 
-# 启动 HTTP 服务 (端口 8080)
+# 启动轻量级 Web 服务
 python -m http.server 8080
 
 ```
 
-### 3. 访问应用
+### 3. 开始探索
 
-打开浏览器访问：
+打开浏览器访问可视化终端：
 👉 **http://localhost:8080**
 
 ---
 
-## 📖 使用指南
+## 📖 操作指南
 
-### 模型配置 (Model Configuration)
+### 🔧 初始化配置 (System Config)
 
-首次运行时，请点击左侧界面的 **"模型配置" (Settings)**：
+首次启动后，点击界面右上角的 **"设置" (Settings)** 图标：
 
-1. **LLM Config**: 输入您的 LLM API Key (如 OpenAI Key)、LLM URL 和模型名称。
-2. **GraphRAG Config**: 配置 Embedding 模型的 Key 和 URL（用于RAG服务）。
-3. 点击 **Save** 保存。配置将写入 `config/saved_config.json`，无需重启。
+1. **LLM Config**: 填入您的模型服务商信息 (API Key, Base URL, Model Name)。
+2. **GraphRAG Config**: 配置 Embedding 模型参数（这是构建知识图谱的关键）。
+3. 点击 **Save**。系统会自动测试连接并持久化保存配置。
 
-### 构建知识库 (Knowledge Base)
+### 📚 构建知识库 (Knowledge Base)
 
-1. 切换到 **"知识库"** 标签页。
-2. 上传您的文档（PDF/TXT/Markdown）。
-3. 系统会在后台自动进行 **GraphRAG 索引构建**（提取实体->构建关系->生成社区）。
-4. 待索引状态变为 `Indexed` 后，即可进行基于图谱的问答。
+让 AgentForce 学习您的私有数据：
 
-### 对话 (Chat)
+1. 进入 **"知识库" (Knowledge)** 标签页。
+2. 拖拽上传文档 (PDF/Markdown/TXT)。
+3. 观察控制台，AgentForce 会自动执行 **ETL 流程**：`文本分块` -> `实体提取` -> `关系构建` -> `社区检出`。
+4. 当状态变更为 `Indexed` 时，知识已注入 Agent 大脑。
 
-在首页对话框输入问题。
+### 💬 智能交互 (Chat)
 
-* 如果涉及知识库内容，Agent 会进行自主规划，进行问答。
-* 对话历史会被自动保存。
+回到首页对话框：
 
----
-
-## 🔌 API 接口概览
-
-后端提供完整的 RESTful API，启动后可访问 `http://localhost:8000/docs` 查看 Swagger 文档。
-
-| 模块 | 方法 | 路径 | 描述 |
-| --- | --- | --- | --- |
-| **对话** | POST | `/chat` | 发送消息并获取智能回复 |
-| **对话** | GET | `/history/saved` | 获取持久化的历史记录 |
-| **GraphRAG** | POST | `/graphrag/documents/upload` | 上传文档并触发索引 |
-| **GraphRAG** | POST | `/graphrag/query` | 基于知识图谱的问答查询 |
-| **GraphRAG** | GET | `/graphrag/index/status` | 查看索引构建进度与统计 |
-| **配置** | GET | `/config` | 获取当前系统配置 (已脱敏) |
-| **配置** | POST | `/config` | 更新系统配置 |
+* **提问**: "根据上传的财报，分析该公司去年的主要风险点。"
+* **Agent 响应**: Agent 将自动识别意图，调用 GraphRAG 进行全局检索，并综合生成深度回答。
 
 ---
 
-## 🛠️ 技术栈
+## 🔌 API 开发文档
 
-* **Language**: Python 3.10+
-* **Web Framework**: FastAPI
-* **Data Validation**: Pydantic
-* **RAG Engine**: GraphRAG (NetworkX, Community Detection)
-* **Frontend**: Native HTML5/JS (No framework required)
-* **Task Queue**: FastAPI BackgroundTasks (用于异步索引构建)
+后端提供标准的 OpenAPI/Swagger 文档。服务启动后，访问 `http://localhost:8000/docs` 即可查看和调试接口。
+
+| 模块 | Endpoint | 描述 |
+| --- | --- | --- |
+| **Chat** | `POST /chat` | 核心对话接口，触发 Agent 工作流 |
+| **History** | `GET /history/saved` | 拉取持久化的历史会话 |
+| **GraphRAG** | `POST /graphrag/upload` | 上传文件并触发异步索引任务 |
+| **GraphRAG** | `POST /graphrag/query` | 执行图谱增强的深度查询 |
+| **System** | `GET /config` | 获取当前系统运行参数 |
+
+---
+
+## 🛠 技术栈
+
+* **Core**: Python 3.10+, LangChain (Optional), NetworkX
+* **Web Framework**: FastAPI, Uvicorn
+* **RAG Engine**: GraphRAG, Community Detection Algorithms
+* **Frontend**: Vanilla JS (ES6+), HTML5, CSS3
+* **Async Task**: Python `asyncio` & FastAPI `BackgroundTasks`
+
+
 

@@ -1,8 +1,6 @@
 """
-GraphRAG 核心实现 - 优化版
-支持 UUID、持久化、增量更新
+GraphRAG 核心实现 
 
-路径: src/services/rag_graph.py
 """
 
 import faiss
@@ -187,18 +185,11 @@ class TextChunker:
 
 class GraphRAGPipeline:
     """
-    GraphRAG Pipeline - 完整实现
+    GraphRAG Pipeline
     
-    功能：
-    1. 文档解析（PDF/DOCX/TXT/MD/CSV）
-    2. 智能分块
-    3. 实体关系提取
-    4. 知识图谱构建
-    5. 层次化社区检测
-    6. 向量索引
-    7. Map-Reduce 查询
-    8. UUID 支持
-    9. 持久化存储
+    1. 添加文档后自动保存
+    2. 初始化时自动加载已有数据
+    3. text_chunks 为空的问题
     """
 
     def __init__(self, llm_api_key: str, embedding_api_key: str, llm_url: str, 
@@ -244,6 +235,18 @@ class GraphRAGPipeline:
         self.community_embeddings = []
         
         self.encoding = tiktoken.get_encoding("cl100k_base")
+        
+        self._auto_load_if_exists()
+    
+    def _auto_load_if_exists(self):
+        """初始化时自动加载已有数据"""
+        try:
+            self.load("default")
+            logger.info(f"✅ 自动加载知识库成功: {len(self.documents)} 个文档, {len(self.text_chunks)} 个chunks")
+        except FileNotFoundError:
+            logger.info("📝 未找到已有知识库，将创建新的")
+        except Exception as e:
+            logger.warning(f"⚠️ 加载知识库失败: {e}")
     
     # ==================== 文档管理 ====================
     
@@ -269,20 +272,22 @@ class GraphRAGPipeline:
         
         file_hash = self._calculate_file_hash(str(file_path))
         
+        # 检查文档是否已存在
         if file_hash in self.documents:
-            logger.info(f"文档已存在: {file_path.name}")
+            logger.info(f"⚠️ 文档已存在: {file_path.name}")
             return self.docid_to_uuid.get(file_hash, doc_uuid)
         
-        logger.info(f"添加文档: {file_path.name} (UUID: {doc_uuid})")
+        logger.info(f"📄 添加文档: {file_path.name} (UUID: {doc_uuid})")
         
         # 解析文档
         text = self.document_parser.parse_document(str(file_path))
+        logger.info(f"  📝 文档解析完成，文本长度: {len(text)} 字符")
         
         # 分块
         chunks = self.text_chunker.chunk_text(text)
-        logger.info(f"  分块数量: {len(chunks)}")
+        logger.info(f"  ✂️ 分块完成: {len(chunks)} 个chunks")
         
-        # 记录文档
+        # 记录文档信息
         doc_info = {
             'uuid': doc_uuid,
             'path': str(file_path),
@@ -298,16 +303,34 @@ class GraphRAGPipeline:
         self.uuid_to_docid[doc_uuid] = file_hash
         self.docid_to_uuid[file_hash] = doc_uuid
         
-        # 提取图元素
+        # ★★★提取图元素并添加到 text_chunks ★★★
         chunk_start_id = len(self.text_chunks)
+        logger.info(f"  🔍 开始提取图元素 (起始ID: {chunk_start_id})...")
+        
         for chunk_id, chunk in enumerate(chunks):
             global_chunk_id = chunk_start_id + chunk_id
+            
+            # 提取图元素
+            logger.info(f"    处理 chunk {chunk_id + 1}/{len(chunks)}...")
             elements = self.extract_graph_elements(chunk, global_chunk_id)
+            
+            # ★ 关键：添加到 text_chunks
             self.text_chunks.append(elements)
             self.chunk_to_doc[global_chunk_id] = file_hash
             doc_info['chunk_ids'].append(global_chunk_id)
+            
+            logger.info(f"      提取: {len(elements.get('entities', []))} 实体, "
+                       f"{len(elements.get('relationships', []))} 关系")
         
-        logger.info(f"  完成: 提取了 {len(chunks)} 个文本块")
+        logger.info(f"  ✅ 完成: 提取了 {len(chunks)} 个文本块")
+        logger.info(f"  📊 当前总计: {len(self.text_chunks)} 个chunks")
+        
+        # ★★★ 添加文档后自动保存 ★★★
+        try:
+            self.save("default")
+            logger.info(f"  💾 知识库已自动保存")
+        except Exception as e:
+            logger.error(f"  ❌ 自动保存失败: {e}")
         
         return doc_uuid
     
@@ -322,7 +345,7 @@ class GraphRAGPipeline:
         else:
             raise ValueError(f"文档不存在: {doc_id}")
         
-        logger.info(f"删除文档: {self.documents[internal_doc_id]['name']}")
+        logger.info(f"🗑️ 删除文档: {self.documents[internal_doc_id]['name']}")
         
         # 标记删除的 chunks
         chunk_ids = set(self.documents[internal_doc_id]['chunk_ids'])
@@ -337,7 +360,15 @@ class GraphRAGPipeline:
             self.docid_to_uuid.pop(internal_doc_id, None)
         
         del self.documents[internal_doc_id]
-        logger.info("  文档已删除")
+        
+        # 自动保存
+        try:
+            self.save("default")
+            logger.info("  💾 删除后已自动保存")
+        except Exception as e:
+            logger.error(f"  ❌ 自动保存失败: {e}")
+        
+        logger.info("  ✅ 文档已删除")
     
     def list_documents(self) -> List[Dict]:
         """列出所有文档"""
@@ -383,9 +414,12 @@ class GraphRAGPipeline:
                 response_format={"type": "json_object"}
             )
             
-            return json.loads(response.choices[0].message.content)
+            result = json.loads(response.choices[0].message.content)
+            logger.debug(f"Chunk {chunk_id} 提取结果: {len(result.get('entities', []))} 实体")
+            return result
+            
         except Exception as e:
-            logger.error(f"提取失败: {e}")
+            logger.error(f"提取失败 (chunk {chunk_id}): {e}")
             return {"entities": [], "relationships": [], "claims": []}
     
     def summarize_entity(self, entity_name: str, descriptions: List[str]) -> str:
@@ -414,6 +448,8 @@ class GraphRAGPipeline:
     
     def merge_entities_and_relationships(self):
         """合并实体和关系"""
+        logger.info(f"📊 开始合并实体和关系 (text_chunks数量: {len(self.text_chunks)})...")
+        
         self.entities = {}
         self.relationships = []
         
@@ -421,14 +457,24 @@ class GraphRAGPipeline:
         entity_types = {}
         entity_sources = defaultdict(set)
         
+        # ★★★  text_chunks 是否为空 ★★★
+        if not self.text_chunks:
+            logger.warning("⚠️ text_chunks 为空！请先添加文档。")
+            return
+        
         for chunk_id, chunk_data in enumerate(self.text_chunks):
-            for entity in chunk_data.get('entities', []):
+            entities = chunk_data.get('entities', [])
+            logger.debug(f"  Chunk {chunk_id}: {len(entities)} 实体")
+            
+            for entity in entities:
                 name = entity['name']
                 entity_descriptions[name].append(entity['description'])
                 entity_types[name] = entity['type']
                 entity_sources[name].add(chunk_id)
         
-        logger.info("生成实体摘要...")
+        logger.info(f"  发现 {len(entity_descriptions)} 个唯一实体")
+        logger.info("  生成实体摘要...")
+        
         for entity_name, descriptions in entity_descriptions.items():
             summary = self.summarize_entity(entity_name, descriptions)
             self.entities[entity_name] = {
@@ -456,9 +502,12 @@ class GraphRAGPipeline:
                     'weight': float(np.mean(data['strengths'])),
                     'source_ids': list(data['sources'])
                 })
+        
+        logger.info(f"  ✅ 完成: {len(self.entities)} 实体, {len(self.relationships)} 关系")
     
     def build_graph(self):
         """构建知识图谱"""
+        logger.info("🕸️ 构建知识图谱...")
         self.graph = nx.Graph()
         
         for entity_name, entity_data in self.entities.items():
@@ -475,10 +524,12 @@ class GraphRAGPipeline:
                 weight=rel['weight'],
                 description=rel['description']
             )
+        
+        logger.info(f"  ✅ 图谱: {self.graph.number_of_nodes()} 节点, {self.graph.number_of_edges()} 边")
     
     def detect_hierarchical_communities(self, max_level: int = 3):
         """层次化社区检测"""
-        logger.info("社区检测...")
+        logger.info("👥 社区检测...")
         
         self.communities = {}
         current_graph = self.graph.copy()
@@ -557,17 +608,19 @@ class GraphRAGPipeline:
     
     def generate_all_community_summaries(self):
         """生成所有社区摘要"""
-        logger.info("生成社区摘要...")
+        logger.info("📝 生成社区摘要...")
         self.community_summaries = {}
         
         for level, communities in self.communities.items():
             for comm_id in communities.keys():
                 summary = self.generate_community_summary(level, comm_id)
                 self.community_summaries[(level, comm_id)] = summary
+        
+        logger.info(f"  ✅ 生成了 {len(self.community_summaries)} 个社区摘要")
     
     def build_community_summary_index(self):
         """构建向量索引"""
-        logger.info("构建向量索引...")
+        logger.info("🔍 构建向量索引...")
         
         summaries = []
         summary_metadata = []
@@ -581,13 +634,14 @@ class GraphRAGPipeline:
             })
         
         if not summaries:
-            logger.warning("没有社区摘要可索引")
+            logger.warning("⚠️ 没有社区摘要可索引")
             return
         
         # 生成 embeddings
         embeddings = []
         batch_size = 100
         
+        logger.info(f"  生成 {len(summaries)} 个摘要的向量...")
         for i in range(0, len(summaries), batch_size):
             batch = summaries[i:i + batch_size]
             response = self.embedding_client.embeddings.create(
@@ -606,19 +660,30 @@ class GraphRAGPipeline:
         faiss.normalize_L2(embeddings_array)
         self.community_summary_index.add(embeddings_array)
         
-        logger.info(f"  索引完成: {len(embeddings)} 个社区")
+        logger.info(f"  ✅ 索引完成: {len(embeddings)} 个社区")
     
     # ==================== 索引构建 ====================
     
     def rebuild_index(self):
         """重建索引"""
         logger.info("=" * 60)
-        logger.info("重建 GraphRAG 索引")
+        logger.info("🔄 重建 GraphRAG 索引")
         logger.info("=" * 60)
+        
+        # ★★★ 检查是否有数据 ★★★
+        if not self.text_chunks:
+            logger.error("❌ text_chunks 为空！请先添加文档。")
+            raise RuntimeError("没有文档可以索引，请先上传文档")
+        
+        logger.info(f"📊 数据统计: {len(self.text_chunks)} chunks, {len(self.documents)} 文档")
         
         logger.info("[1/5] 合并实体和关系...")
         self.merge_entities_and_relationships()
         logger.info(f"  完成: {len(self.entities)} 实体, {len(self.relationships)} 关系")
+        
+        if not self.entities:
+            logger.error("❌ 没有提取到实体！请检查文档内容或 LLM 配置")
+            raise RuntimeError("未能提取实体，索引构建失败")
         
         logger.info("[2/5] 构建知识图谱...")
         self.build_graph()
@@ -633,16 +698,23 @@ class GraphRAGPipeline:
         logger.info("[5/5] 构建向量索引...")
         self.build_community_summary_index()
         
+        # ★★★重建索引后自动保存 ★★★
+        try:
+            self.save("default")
+            logger.info("💾 索引重建后已自动保存")
+        except Exception as e:
+            logger.error(f"❌ 自动保存失败: {e}")
+        
         logger.info("=" * 60)
-        logger.info("索引重建完成!")
+        logger.info("✅ 索引重建完成!")
         logger.info("=" * 60)
     
     # ==================== 查询 ====================
     
-    def global_query(self, question: str, top_k_communities: int = 10,return_sample=True) -> str:
+    def global_query(self, question: str, top_k_communities: int = 10, return_sample=False) -> str:
         """查询知识库"""
         if self.community_summary_index is None:
-            raise RuntimeError("索引未构建")
+            raise RuntimeError("索引未构建，请先上传文档并重建索引")
         
         # 检索社区
         query_embedding = self._get_embedding(question)
@@ -653,18 +725,25 @@ class GraphRAGPipeline:
             query_embedding, 
             min(top_k_communities, len(self.community_embeddings))
         )
-        if settings.SIMPLE_RAG:
+        
+        # 简单模式：直接返回社区摘要
+        if getattr(settings, 'SIMPLE_RAG', False) or return_sample:
             search_results = []
+            threshold = getattr(settings, 'T_SCORE', 0.5)
+            
             for idx, score in zip(indices[0], scores[0]):
-                if score>=settings.ThRESHOLD_SCORE:
+                if score >= threshold:
                     search_results.append(self.community_embeddings[idx]['summary'])
-
-            end_str=""
+            
+            if not search_results:
+                return "抱歉，未找到相关信息。"
+            
+            end_str = ""
             for i, res in enumerate(search_results):
-                end_str+=f"社区摘要 {i+1}\n{res}\n\n"
+                end_str += f"社区摘要 {i+1}\n{res}\n\n"
             return end_str
-
-        # Map 阶段
+        
+        # Map-Reduce 模式
         community_answers = []
         
         for idx, score in zip(indices[0], scores[0]):
@@ -682,7 +761,6 @@ class GraphRAGPipeline:
                     'score': float(score)
                 })
         
-        # Reduce 阶段
         return self._reduce_answers(question, community_answers)
     
     def _ask_community(self, question: str, community_summary: str) -> str:
@@ -760,7 +838,7 @@ class GraphRAGPipeline:
         save_dir = self.storage_dir / name
         save_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"保存知识库: {save_dir}")
+        logger.info(f"💾 保存知识库: {save_dir}")
         
         # 保存文档
         with open(save_dir / "documents.json", 'w', encoding='utf-8') as f:
@@ -786,16 +864,16 @@ class GraphRAGPipeline:
                 'community_embeddings': self.community_embeddings,
             }, f)
         
-        # 保存图 - 使用 pickle 代替 write_gpickle
+        # 保存图
         with open(save_dir / "graph.gpickle", 'wb') as f:
             pickle.dump(self.graph, f)
-            
-            # 保存 FAISS
-            if self.community_summary_index:
-                faiss.write_index(self.community_summary_index, 
-                                str(save_dir / "faiss_index.bin"))
-            
-            logger.info("  保存完成")
+        
+        # 保存 FAISS
+        if self.community_summary_index:
+            faiss.write_index(self.community_summary_index, 
+                            str(save_dir / "faiss_index.bin"))
+        
+        logger.info(f"  ✅ 保存完成: {len(self.documents)} 文档, {len(self.text_chunks)} chunks")
     
     def load(self, name: str = "default"):
         """加载知识库"""
@@ -804,7 +882,7 @@ class GraphRAGPipeline:
         if not load_dir.exists():
             raise FileNotFoundError(f"知识库不存在: {load_dir}")
         
-        logger.info(f"加载知识库: {load_dir}")
+        logger.info(f"📂 加载知识库: {load_dir}")
         
         # 加载文档
         with open(load_dir / "documents.json", 'r', encoding='utf-8') as f:
@@ -830,7 +908,7 @@ class GraphRAGPipeline:
             self.community_summaries = data['community_summaries']
             self.community_embeddings = data['community_embeddings']
         
-        # 加载图 - 使用 pickle.load 代替 nx.read_gpickle
+        # 加载图
         with open(load_dir / "graph.gpickle", 'rb') as f:
             self.graph = pickle.load(f)
         
@@ -839,4 +917,5 @@ class GraphRAGPipeline:
         if index_path.exists():
             self.community_summary_index = faiss.read_index(str(index_path))
         
-        logger.info(f"  加载完成: {len(self.documents)} 文档, {len(self.entities)} 实体")
+        logger.info(f"  ✅ 加载完成: {len(self.documents)} 文档, "
+                   f"{len(self.text_chunks)} chunks, {len(self.entities)} 实体")

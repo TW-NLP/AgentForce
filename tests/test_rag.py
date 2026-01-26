@@ -53,7 +53,7 @@ async def main():
     rag_service = RAGService()
     
     # 2. 准备测试问题
-    test_query = "公文通知写作大模型技术"
+    test_query = "大模型技术"
     
     print(f"\n--- 开始测试 RAG 服务 ---")
     

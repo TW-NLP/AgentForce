@@ -18,7 +18,7 @@ from typing import ClassVar
 class Settings(BaseSettings):
     """应用配置"""
     # 加载已有的配置
-    CONFIG_FILE: ClassVar[Path] = Path("config/saved_config.json")
+    CONFIG_FILE: ClassVar[Path] = Path("data/saved_config.json")
 
 
     
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # ==================== LLM 配置 ====================
     LLM_MODEL: str = ""
-    LLM_BASE_URL: str = ""
+    LLM_URL: str = ""
     LLM_API_KEY: str = ""
 
     # ==================== Search 配置 ====================
@@ -47,9 +47,15 @@ class Settings(BaseSettings):
     ENABLE_COMPOSITE_TASKS: bool = True
 
     # ==================== RAG 配置 ====================
+
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_URL: str = ""
+    EMBEDDING_MODEL: str = ""
+    EMBEDDING_DIM: int = 1024
     SIMPLE_RAG: bool = True #默认为简单RAG，若使用复杂的RAG 请设置为False
-    ThRESHOLD_SCORE: float = Field(default=0.4, ge=0.0, le=1.0, description="RAG检索阈值")
+    T_SCORE: float = Field(default=0.3, description="RAG检索阈值")
     RAG_URL: str = "http://localhost:8000/api/graphrag/query"
+    GRAPHRAG_STORAGE_DIR: str = "data/rag_graph_storage"
 
     # ==================== 内容处理配置 ====================
     MAX_CONTEXT_LENGTH: int = Field(default=8000, description="最大上下文长度")
@@ -93,7 +99,7 @@ class Settings(BaseSettings):
                 if "llm_config" in json_data:
                     llm_config = json_data["llm_config"]
                     config_data["LLM_API_KEY"] = llm_config.get("LLM_API_KEY", "")
-                    config_data["LLM_BASE_URL"] = llm_config.get("LLM_URL", "")
+                    config_data["LLM_URL"] = llm_config.get("LLM_URL", "")
                     config_data["LLM_MODEL"] = llm_config.get("LLM_MODEL", "")
                 
                 if "search_config" in json_data:
@@ -103,11 +109,16 @@ class Settings(BaseSettings):
                 if "claw_config" in json_data:
                     claw_config = json_data["claw_config"]
                     config_data["FIRECRAWL_API_KEY"] = claw_config.get("FIRECRAWL_API_KEY", "")
+                if "embedding_config" in json_data:
+                    embedding_config = json_data["embedding_config"]
+                    config_data["EMBEDDING_API_KEY"] = embedding_config.get("EMBEDDING_API_KEY", "")
+                    config_data["EMBEDDING_URL"] = embedding_config.get("EMBEDDING_URL", "")
+                    config_data["EMBEDDING_MODEL"] = embedding_config.get("EMBEDDING_MODEL", "")
                 
                 print(f"✅ 成功从 {self.CONFIG_FILE} 加载配置")
                 
             except json.JSONDecodeError as e:
-                print(f"⚠️ JSON解析错误: {e}")
+                print(f"配置为空，不要忘记在前端进行配置。")
             except Exception as e:
                 print(f"⚠️ 加载配置文件失败: {e}")
         else:
@@ -136,7 +147,7 @@ class Settings(BaseSettings):
         config_mapping = {
             "llm_config": {
                 "LLM_API_KEY": "LLM_API_KEY",
-                "LLM_URL": "LLM_BASE_URL",
+                "LLM_URL": "LLM_URL",
                 "LLM_MODEL": "LLM_MODEL"
             },
             "search_config": {
@@ -155,6 +166,7 @@ class Settings(BaseSettings):
                         actual_field = mapping[key]
                         if hasattr(self, actual_field):
                             setattr(self, actual_field, value)
+        
             
 
     class Config:
@@ -201,7 +213,7 @@ def get_llm_config() -> dict:
     return {
         "model": settings.LLM_MODEL,
         "api_key": settings.LLM_API_KEY,
-        "base_url": settings.LLM_BASE_URL,
+        "base_url": settings.LLM_URL,
         "streaming": True,
     }
 
@@ -211,7 +223,7 @@ def get_planner_config() -> dict:
     return {
         "model": settings.LLM_MODEL,
         "api_key": settings.LLM_API_KEY,
-        "base_url": settings.LLM_BASE_URL,
+        "base_url": settings.LLM_URL,
         "streaming": False,  # 规划不需要流式输出
     }
 

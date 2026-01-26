@@ -1,13 +1,17 @@
 # AgentForce
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.95%2B-009688)](https://fastapi.tiangolo.com/)
-[![GraphRAG](https://img.shields.io/badge/RAG-GraphRAG-purple)](https://github.com/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.128%2B-009688)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 **AgentForce** 是一个融合了 **GraphRAG（图谱增强检索）** 认知能力与 **Agentic Workflow（代理工作流）** 执行能力的下一代智能对话平台。
 
 不同于传统的 RAG 系统，AgentForce 不仅能“检索”片段，更能通过构建知识图谱“理解”全貌，并通过自主代理规划“执行”复杂任务。系统采用现代化的前后端分离架构，旨在为开发者提供开箱即用的深度问答与知识库构建解决方案。
+<div align="center">
+  <img src="workflow_graph.png" alt="agent执行流程" width="80%">
+  <br>
+  <em>AgentForce 智能执行流程图</em>
+</div>
 
 ---
 
@@ -16,7 +20,7 @@
 ### 1. ⚡️ Agentic Workflow (代理工作流)
 超越简单的问答，AgentForce 具备自主规划能力：
 - **动态规划**: Agent 根据问题复杂度，自动判断是否需要查阅知识库、联网搜索或进行多步推理。
-- **记忆增强**: 内置会话持久化机制 (`saved_history.json`)，支持跨周期的长程记忆与上下文理解。
+- **记忆增强**: 内置会话持久化机制 (`data/saved_history.json`)，支持跨周期的长程记忆与上下文理解。
 - **会话隔离**: 完备的 Session 管理体系，支持多用户、多会话并行处理。
 
 ### 2. 🕸️ Graph-Powered Knowledge (图谱认知)
@@ -29,7 +33,7 @@
 全热更新配置，无需重启服务：
 - **模型热切换**: 随时在 GPT-4o, Claude-3.5 或本地模型间切换。
 - **工具链集成**: 一键配置 Tavily (联网搜索) 和 Firecrawl (网页爬取) 等外部工具。
-- **持久化配置**: 所有系统参数自动保存至 `config/saved_config.json`，确保配置不丢失。
+- **持久化配置**: 所有系统参数自动保存至 `data/saved_config.json`，确保配置不丢失。
 
 ---
 
@@ -66,7 +70,7 @@ AgentForce/
 
 ### 1. 环境准备
 
-确保您的环境已安装 **Python 3.10+**。
+确保您的环境已安装 **Python 3.12+**。
 
 ```bash
 # 1. 克隆仓库
@@ -121,11 +125,18 @@ python -m http.server 8080
 
 ### 🔧 模型配置 (Model Config)
 
-首次启动后，点击界面左侧的 **"模型配置"** 图标：
+首次启动后，点击界面左侧的 **"模型配置"** 图标。
+下面的 LLM、Embedding 参数配置需符合 OpenAI 规范。
+Tavily 搜索配置请访问：[app.tavily.com](https://app.tavily.com/home) 获取 API Key。
 
 1. **LLM Config**: 填入您的模型服务商信息 (API Key, URL, Model Name)。
 2. **GraphRAG Config**: 配置 Embedding 模型参数（RAG服务）。
 3. 点击 **保存配置**。系统会自动测试连接并持久化保存配置。
+<div align="center">
+  <img src="images/model_config.jpg" alt="模型配置" width="80%">
+  <br>
+  <em>模式注册</em>
+</div>
 
 ### 📚 构建知识库 (Knowledge Base)
 
@@ -134,7 +145,11 @@ python -m http.server 8080
 1. 进入 **"知识库" (Knowledge)** 标签页。
 2. 拖拽上传文档 (PDF/Markdown/TXT)。
 3. 观察控制台，AgentForce 会自动执行 **ETL 流程**：`文本分块` -> `实体提取` -> `关系构建` -> `社区检出`。
-4. 知识已注入 Agent 大脑。
+<div align="center">
+  <img src="images/rag.jpg" alt="模型配置" width="80%">
+  <br>
+  <em>模式注册</em>
+</div>
 
 ### 💬 智能交互 (Chat)
 
@@ -143,6 +158,11 @@ python -m http.server 8080
 * **提问**: "根据上传的财报，分析该公司去年的主要风险点。"
 * **Agent 响应**: Agent 将自动识别意图，调用不同的agent进行回复，并综合生成深度回答。
 
+<div align="center">
+  <img src="images/chat.jpg" alt="模型配置" width="80%">
+  <br>
+  <em>模式注册</em>
+</div>
 ---
 
 ## 🔌 API 开发文档
@@ -161,7 +181,7 @@ python -m http.server 8080
 
 ## 🛠 技术栈
 
-* **Core**: Python 3.10+, LangChain (Optional), NetworkX
+* **Core**: Python 3.12+, LangChain (Optional), NetworkX
 * **Web Framework**: FastAPI, Uvicorn
 * **RAG Engine**: GraphRAG, Community Detection Algorithms
 * **Frontend**: Vanilla JS (ES6+), HTML5, CSS3

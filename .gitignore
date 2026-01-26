@@ -1,3 +1,7 @@
 /.vscode/
 *.pyc
+/config/saved_config.json
+/config/saved_history.json
+/uploads/
+/data/
 

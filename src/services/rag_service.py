@@ -26,7 +26,7 @@ class RAGService:
                 response = await client.post(
                     self.search_url, 
                     json=payload, 
-                    timeout=30.0 
+                    timeout=100.0 
                 )
                 response.raise_for_status()
                 result = response.json()

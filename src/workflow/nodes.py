@@ -216,7 +216,7 @@ async def execute_plan_node(state: AgentState) -> Dict[str, Any]:
                     await callback.emit(EventType.STEP, StepEvent.create(
                         step=f"doc_search_done_{i}",
                         title=f"✓ 文档搜索完成",
-                        description=f"检索到 {result.get('doc_count', 0)} 个相关文档"
+                        description=f"检索到相关文档"
                     ))
             except Exception as e:
                 logger.error(f"文档搜索失败: {e}")

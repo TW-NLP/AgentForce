@@ -74,7 +74,7 @@ AgentForce/
 
 ```bash
 # 1. 克隆仓库
-git clone [https://github.com/your-username/AgentForce.git](https://github.com/your-username/AgentForce.git)
+git clone [https://github.com/your-username/AgentForce.git](https://github.com/TW-NLP/AgentForce)
 cd AgentForce
 
 # 2. 创建虚拟环境 (建议)

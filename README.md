@@ -176,7 +176,6 @@ Tavily 搜索配置请访问：[app.tavily.com](https://app.tavily.com/home) 获
   <em>智能交互</em>
 </div>
 
-
 ### 👤 用户画像 (User Persona)
 
 回到首页对话框：
@@ -185,16 +184,19 @@ Tavily 搜索配置请访问：[app.tavily.com](https://app.tavily.com/home) 获
 * **Agent 响应**: 你好！😊 根据我们的对话历史，我注意到你是一位深耕自然语言处理（NLP）领域的核心AI实践者——对NLP兴趣浓厚
 
 <div align="center">
+  <img src="images/chat_example.jpg" alt="效果展示" width="80%">
+  <br>
+  <em>问答效果展示</em>
+</div>
+
+
+<div align="center">
   <img src="images/person_like.jpg" alt="用户画像的展示" width="80%">
   <br>
   <em>用户画像</em>
 </div>
 
-<div align="center">
-  <img src="images/chat_example.jpg" alt="效果展示" width="80%">
-  <br>
-  <em>问答效果展示</em>
-</div>
+
 
 
 ## 🔌 API 开发文档

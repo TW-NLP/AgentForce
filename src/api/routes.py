@@ -28,6 +28,7 @@ except ImportError:
     GRAPHRAG_AVAILABLE = False
     logging.warning("GraphRAG 模块未找到，相关功能将不可用")
 
+from src.api.websocket import ConversationHistoryManager
 from src.workflow.agent import ConversationalAgent
 
 logger = logging.getLogger(__name__)
@@ -38,14 +39,29 @@ router = APIRouter()
 # 配置文件路径
 CONFIG_FILE = Path("data/saved_config.json")
 CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-HISTORY_FILE = Path("data/saved_history.json")
+HISTORY_FILE = Path("data/history")
 
 
 # ==================== 数据模型 ====================
 
-class SavedHistoryResponse(BaseModel):
+class SavedSessionItem(BaseModel):
+    session_id: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    conversation_count: int
+    conversation: List[Dict[str, Any]]
+    # ✅ 新增 title 字段，用于前端显示对话摘要
+    title: Optional[str] = "新对话"
+
+class SavedHistoryListResponse(BaseModel):
     success: bool
-    history: List[Dict[str, Any]]
+    total: int
+    sessions: List[SavedSessionItem]
+
+class SavedSessionDetailResponse(BaseModel):
+    success: bool
+    session_id: str
+    conversations: List[Dict[str, Any]]
 
 
 class ChatRequest(BaseModel):
@@ -62,6 +78,7 @@ class ChatResponse(BaseModel):
 class HistoryResponse(BaseModel):
     history: List[Dict[str, str]]
     session_id: str
+
 
 
 class StatusResponse(BaseModel):
@@ -132,6 +149,17 @@ class ConfigResponse(BaseModel):
     success: bool
     message: str
     config: Optional[Dict[str, Any]] = None
+
+
+
+class SavedSessionItem(BaseModel):
+    session_id: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    conversation_count: int
+
+
+
 
 
 # ==================== GraphRAG 管理器（优化版）====================
@@ -334,55 +362,23 @@ class GraphRAGManager:
 # ==================== Session 管理器 ====================
 
 class SessionManager:
-    """Session 管理器"""
-    
     def __init__(self):
-        self.sessions: Dict[str, ConversationalAgent] = {}
-        self.session_timestamps: Dict[str, datetime] = {}
-    
-    def get_or_create_session(self, session_id: Optional[str] = None) -> tuple[str, ConversationalAgent]:
-        """获取或创建 Session"""
-        if session_id and session_id in self.sessions:
-            self.session_timestamps[session_id] = datetime.now()
-            return session_id, self.sessions[session_id]
-        
-        new_session_id = str(uuid.uuid4())
-        self.sessions[new_session_id] = ConversationalAgent()
-        self.session_timestamps[new_session_id] = datetime.now()
-        
-        logger.info(f"创建新会话: {new_session_id}")
-        return new_session_id, self.sessions[new_session_id]
-    
-    def clear_session(self, session_id: str):
-        """清空 Session 历史"""
-        if session_id in self.sessions:
-            self.sessions[session_id].clear_history()
-            logger.info(f"清空会话历史: {session_id}")
-    
-    def delete_session(self, session_id: str):
-        """删除 Session"""
-        if session_id in self.sessions:
-            del self.sessions[session_id]
-            del self.session_timestamps[session_id]
-            logger.info(f"删除会话: {session_id}")
-    
-    def cleanup_old_sessions(self, timeout_seconds: int = 3600):
-        """清理过期 Session"""
-        now = datetime.now()
-        expired_sessions = [
-            sid for sid, ts in self.session_timestamps.items()
-            if (now - ts).total_seconds() > timeout_seconds
-        ]
-        
-        for sid in expired_sessions:
-            self.delete_session(sid)
-        
-        if expired_sessions:
-            logger.info(f"清理了 {len(expired_sessions)} 个过期会话")
-    
-    def get_session_count(self) -> int:
-        """获取当前 Session 数量"""
-        return len(self.sessions)
+        self.sessions = {}
+        self.session_timestamps = {}
+    def get_or_create_session(self, session_id=None):
+        if session_id and session_id in self.sessions: return session_id, self.sessions[session_id]
+        sid = str(uuid.uuid4())
+        self.sessions[sid] = ConversationalAgent()
+        return sid, self.sessions[sid]
+    def clear_session(self, sid):
+        if sid in self.sessions: self.sessions[sid].clear_history()
+    def delete_session(self, sid):
+        if sid in self.sessions: del self.sessions[sid]
+    def cleanup_old_sessions(self, timeout): pass
+    def get_session_count(self): return len(self.sessions)
+
+def load_config_from_file(): return {}
+def save_config_to_file(cfg): return {}
 
 
 # ==================== 全局管理器实例 ====================
@@ -406,26 +402,6 @@ def load_history_from_file() -> List[Dict[str, Any]]:
             logger.error(f"加载历史记录失败: {e}")
             return []
     return []
-
-
-def save_conversation_to_file(user_msg: str, ai_msg: str):
-    """将对话追加保存到 JSON 文件"""
-    try:
-        history_data = load_history_from_file()
-        
-        new_entry = {
-            "id": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "user_content": user_msg,
-            "ai_content": ai_msg
-        }
-        history_data.append(new_entry)
-        
-        with HISTORY_FILE.open('w', encoding='utf-8') as f:
-            json.dump(history_data, f, ensure_ascii=False, indent=4)
-            
-    except Exception as e:
-        logger.error(f"❌ 保存历史记录失败: {e}")
 
 
 def load_config_from_file() -> Dict[str, Any]:
@@ -494,17 +470,6 @@ async def rebuild_index_background():
         logger.error(f"❌ 重建索引失败: {e}", exc_info=True)
 
 
-# ==================== 对话接口 ====================
-
-@router.get("/history/saved", response_model=SavedHistoryResponse, tags=["对话"])
-async def get_saved_history():
-    """获取保存的历史记录"""
-    history_data = load_history_from_file()
-    return SavedHistoryResponse(
-        success=True,
-        history=history_data
-    )
-
 
 @router.post("/chat", response_model=ChatResponse, tags=["对话"])
 async def chat(request: ChatRequest):
@@ -516,7 +481,6 @@ async def chat(request: ChatRequest):
         logger.info(f"[{session_id}] 收到消息: {request.message[:50]}...")
         
         response_content = await agent.chat(request.message)
-        save_conversation_to_file(request.message, response_content)
         
         return ChatResponse(
             message=response_content,
@@ -529,6 +493,23 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/history/saved", response_model=SavedHistoryListResponse, tags=["对话历史"])
+async def get_saved_history_list():
+    """获取所有已保存的会话历史列表"""
+    try:
+        # 调用刚刚修改过的 list_sessions
+
+        history_manager=ConversationHistoryManager()
+        sessions = history_manager.list_sessions()
+        
+        return SavedHistoryListResponse(
+            success=True,
+            total=len(sessions),
+            sessions=sessions
+        )
+    except Exception as e:
+        logger.error(f"获取历史记录列表失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 @router.get("/history/{session_id}", response_model=HistoryResponse, tags=["对话"])
 async def get_history(session_id: str):
     """获取对话历史"""
@@ -541,7 +522,6 @@ async def get_history(session_id: str):
         history=agent.get_history(),
         session_id=session_id
     )
-
 
 @router.post("/clear/{session_id}", response_model=StatusResponse, tags=["对话"])
 async def clear_history(session_id: str):

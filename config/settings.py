@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     """应用配置"""
     # 加载已有的配置
     CONFIG_FILE: ClassVar[Path] = Path("data/saved_config.json")
+    HISTORY_FILE: ClassVar[Path] = Path("data/history")
 
 
     

@@ -27,7 +27,6 @@ const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
 
 // ============ 1. 历史记录加载与管理 ============
-
 async function loadSavedHistory() {
     try {
         console.log("正在加载历史记录...");
@@ -45,31 +44,57 @@ async function loadSavedHistory() {
             historyList.innerHTML = '';
         }
 
-        if (data.success && Array.isArray(data.history) && data.history.length > 0) {
-            // 倒序排列，最新的显示在最上面
-            const reversedHistory = [...data.history].reverse();
+        // ★★★ 适配新的数据结构：sessions ★★★
+        if (data.success && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            // 按更新时间倒序排列，最新的显示在最上面
+            const sortedSessions = [...data.sessions].sort((a, b) => 
+                new Date(b.updated_at) - new Date(a.updated_at)
+            );
 
-            reversedHistory.forEach((entry) => {
-                // entry 预期结构: { user_content, ai_content, timestamp, id? }
-                // 如果没有 user_content 则跳过
-                if (!entry.user_content) return;
-
+            sortedSessions.forEach((session) => {
                 const li = document.createElement('li');
                 li.className = 'history-item';
                 
-                // 截取前 20 个字符作为标题
-                const title = entry.user_content.length > 20 
-                    ? entry.user_content.substring(0, 20) + '...' 
-                    : entry.user_content;
+                // 使用 session 的 title，如果没有则用第一条对话的内容
+                let title = session.title || '新对话';
+                
+                // 如果 title 是 "新对话" 且有对话内容，用第一条用户消息作为标题
+                if (title === '新对话' && session.conversation && session.conversation.length > 0) {
+                    const firstMsg = session.conversation[0].user_content;
+                    if (firstMsg) {
+                        title = firstMsg.length > 20 
+                            ? firstMsg.substring(0, 20) + '...' 
+                            : firstMsg;
+                    }
+                }
                 
                 li.textContent = title;
-                li.title = entry.user_content; // 鼠标悬停显示完整问题
                 
-                // 点击事件：恢复这段对话
-                li.onclick = () => restoreConversation(entry);
+                // 显示对话数量和时间
+                const conversationInfo = document.createElement('span');
+                conversationInfo.className = 'conversation-info';
+                conversationInfo.textContent = ` (${session.conversation_count}条)`;
+                conversationInfo.style.fontSize = '0.85em';
+                conversationInfo.style.color = '#999';
+                li.appendChild(conversationInfo);
+                
+                // 完整标题作为 tooltip
+                li.title = `${title}\n对话数: ${session.conversation_count}\n时间: ${new Date(session.updated_at).toLocaleString('zh-CN')}`;
+                
+                // 点击事件：恢复整个 session 的对话
+                li.onclick = () => restoreSession(session);
                 
                 historyList.appendChild(li);
             });
+        } else {
+            // 没有历史记录时显示提示
+            const emptyTip = document.createElement('li');
+            emptyTip.className = 'history-empty';
+            emptyTip.textContent = '暂无历史记录';
+            emptyTip.style.textAlign = 'center';
+            emptyTip.style.color = '#999';
+            emptyTip.style.padding = '20px';
+            historyList.appendChild(emptyTip);
         }
     } catch (error) {
         console.error("加载历史记录失败:", error);
@@ -79,19 +104,24 @@ async function loadSavedHistory() {
 /**
  * 恢复显示某一段历史对话
  */
-function restoreConversation(entry) {
+function restoreSession(session) {
     // 1. 清空当前屏幕
     resetChatUI();
 
-    // 2. 显示用户提问
-    addMessage('user', entry.user_content);
-
-    // 3. 显示 AI 回答 (如果有)
-    if (entry.ai_content) {
-        addMessage('assistant', entry.ai_content);
+    // 2. 遍历显示所有对话
+    if (session.conversation && session.conversation.length > 0) {
+        session.conversation.forEach(msg => {
+            // 显示用户提问
+            if (msg.user_content) {
+                addMessage('user', msg.user_content);
+            }
+            // 显示 AI 回答
+            if (msg.ai_content) {
+                addMessage('assistant', msg.ai_content);
+            }
+        });
     }
 }
-
 /**
  * 重置聊天界面 (清空消息，显示欢迎页)
  * 但这里我们实际上是清空消息，隐藏欢迎页(如果有新消息)

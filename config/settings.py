@@ -14,18 +14,43 @@ from typing import ClassVar
 
 class Settings(BaseSettings):
     """应用配置"""
+
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).parent.parent
     
     CONFIG_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "saved_config.json"
     HISTORY_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "history"
     PERSON_LIKE_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "person_like.json"
-    
+
     @classmethod
     def ensure_data_dir(cls):
         """确保 data 目录存在"""
         data_dir = cls.PROJECT_ROOT / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
         return data_dir
+    
+    @classmethod
+    def ensure_files(cls):
+        """确保所有必要的文件存在"""
+        # 先确保目录存在
+        cls.ensure_data_dir()
+        
+        # 确保 CONFIG_FILE 存在，如果不存在则创建空的 JSON 对象
+        if not cls.CONFIG_FILE.exists():
+            cls.CONFIG_FILE.write_text(json.dumps({}, ensure_ascii=False, indent=2))
+        
+        if not cls.HISTORY_FILE.exists():
+            # 如果是文件
+            cls.HISTORY_FILE.touch()
+        
+        # 确保 PERSON_LIKE_FILE 存在
+        if not cls.PERSON_LIKE_FILE.exists():
+            cls.PERSON_LIKE_FILE.write_text(json.dumps({}, ensure_ascii=False, indent=2))
+    
+    @classmethod
+    def initialize(cls):
+        """初始化配置（推荐在应用启动时调用）"""
+        cls.ensure_files()
+        return cls()
 
 
 

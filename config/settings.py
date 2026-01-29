@@ -220,7 +220,7 @@ def get_settings() -> Settings:
 
 # 导出配置实例
 settings = get_settings()
-settings.ensure_data_dir()
+settings.initialize()
 
 
 # ==================== 配置验证 ====================

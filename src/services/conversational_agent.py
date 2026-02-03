@@ -23,10 +23,10 @@ class ConversationalAgent(BaseConfigurableService):
         
         self.status_callback = status_callback
         self.workspace = self.settings.SERVICE_DIR
-        # 1. 准备用户画像
+        # 1.用户画像
         self.user_profile_data = UserPreferenceMining().get_frontend_format()
         self.user_summary = self.user_profile_data.get("summary", "No specific preference.")
-        # 2. 基础设施工具 (Shell)
+        # 2. 基础设施工具
         self.exec_tool = ShellTool()
         self.exec_tool.description = (
             "Execute shell commands. Use this ONLY when a Skill documentation "
@@ -55,13 +55,11 @@ class ConversationalAgent(BaseConfigurableService):
         )
         system_prompt = f"""你是一个精确执行的智能体，需要判断是否进行工具的调用，如果是闲聊，则直接回答用户的问题，如果是需要使用技能，则严格按照下面的规范执行。 
 # 🛠 执行规范（严格）
-
 1. **工作目录**：你当前的工作目录是 {self.workspace}。  
 2. **命令格式**：**只能**使用以下格式：  
    python skills/<skill-name>/scripts/<script_name>.py --query "your query"  
 3. **禁止探索**：不要使用 ls 查看文件。不要使用 cd 切换目录。  
 4. **禁止绝对路径**：绝不能使用以 /Users/... 开头的路径，只能使用以 skills/ 开头的相对路径。  
-
 # 👤 用户上下文
 {self.user_summary}
 """

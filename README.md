@@ -1,76 +1,67 @@
-# AgentForce
+# DeepAgentForce
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.128%2B-009688)](https://fastapi.tiangolo.com/)
+[![DeepAgents](https://img.shields.io/badge/DeepAgents-latest-orange)](https://github.com/deepagents/deepagents)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-**AgentForce** 是一个融合了 **GraphRAG（图谱增强检索）** 认知能力与 **Agentic Workflow（代理工作流）** 执行能力的下一代智能对话平台。
+**DeepAgentForce** 是一个基于 **DeepAgents 框架** 构建的下一代智能对话平台，深度融合了 **GraphRAG（图谱增强检索）** 认知能力与 **Agent Skills（技能系统）** 执行能力。
 
-不同于传统的 RAG 系统，AgentForce 不仅能“检索”片段，更能通过构建知识图谱“理解”全貌，并通过自主代理规划“执行”复杂任务。系统采用现代化的前后端分离架构，旨在为开发者提供开箱即用的深度问答与知识库构建解决方案。
-<div align="center">
-  <img src="images/agentic.png" alt="agent执行流程" width="80%">
-  <br>
-  <em>AgentForce 智能执行流程图</em>
-</div>
+不同于传统 RAG 系统的片段检索，DeepAgentForce 通过知识图谱构建实现全局"理解"，并借助 DeepAgents 的 Skill 系统与自主规划能力"执行"复杂任务。系统采用现代化前后端分离架构，提供开箱即用的深度问答与知识库构建解决方案。
 
 ---
 
 ## ✨ 核心特性
 
-### 1. ⚡️ Agentic Workflow (代理工作流)
-超越简单的问答，AgentForce 具备自主规划能力：
-- **动态规划**: Agent 根据问题复杂度，自动判断是否需要查阅知识库、联网搜索或进行多步推理。
-- **记忆增强**: 内置会话持久化机制 (`data/saved_history.json`)，支持跨周期的长程记忆与上下文理解。
-- **会话隔离**: 完备的 Session 管理体系，支持多用户、多会话并行处理。
+### 1. 🧠 Agent Skills - 即插即用的技能系统
 
-### 2. 🕸️ Graph-Powered Knowledge (图谱认知)
-基于 GraphRAG 技术，从碎片化信息中重构知识网络：
-- **深度理解**: 自动提取实体 (Entities)、构建关系 (Relationships) 并生成社区摘要 (Community Summaries)。
-- **全局查询 (Global Query)**: 能够回答 "总结这几份文档的主要冲突点" 等宏观问题，这是传统向量检索无法做到的。
-- **多模态支持**: 支持 PDF, DOCX, TXT, MD, CSV 等多种格式的即时索引与可视化状态监控。
+本项目在 `/src/services/skills` 目录下提供了两个示例 Skills，抛砖引玉：
+- **PDF Skills** - PDF 文档处理能力
+- **Web Search** - 联网搜索能力
 
-### 3. 🎛️ Dynamic Control (动态中枢)
+#### 🔌 零配置扩展机制
+- **即放即用**: 根据 Agent Skills 规范编写新的 Skill 后，直接放入 `skills/` 目录即可
+- **自动融合**: 框架会自动发现并加载新增的 Skills，无需修改任何代码
+- **热加载**: 支持运行时动态加载，无需重启服务
+
+#### 📝 Skill 开发规范
+每个 Skill 只需包含：
+- `SKILL.md` - 技能说明文档，定义能力和使用方法
+- （可选）Python 脚本 - 实现复杂逻辑
+
+Agent 会自动读取 `SKILL.md` 并理解如何使用该技能，实现真正的模块化扩展。
+
+### 2. 🕸️ GraphRAG 知识图谱
+从碎片化信息中重构知识网络：
+- **深度理解**: 自动提取实体 (Entities)、构建关系 (Relationships) 并生成社区摘要 (Community Summaries)
+- **全局查询**: 回答 "总结这几份文档的主要冲突点" 等宏观问题，突破传统向量检索局限
+- **多模态支持**: 支持 PDF、DOCX、TXT、MD、CSV 等多种格式的即时索引与可视化状态监控
+- **社区检测**: 基于图算法自动发现文档中的主题社区和知识聚类
+
+### 3. 🎛️ 动态配置中枢
 全热更新配置，无需重启服务：
-- **模型热切换**: 随时在 GPT-4o, Claude-3.5 或本地模型间切换。
-- **工具链集成**: 一键配置 Tavily (联网搜索) 和 Firecrawl (网页爬取) 等外部工具。
-- **持久化配置**: 所有系统参数自动保存至 `data/saved_config.json`，确保配置不丢失。
+- **模型热切换**: 随时在 GPT-4o、Claude-3.5、Qwen-Plus 或本地模型间切换
+- **工具链集成**: 一键配置 Tavily（联网搜索）和 Firecrawl（网页爬取）等外部工具
+- **持久化配置**: 所有系统参数自动保存至 `data/saved_config.json`，确保配置不丢失
+- **实时生效**: 配置变更自动触发服务重建，确保最新参数立即应用
 
-
-### 4. 👤 User Persona (用户画像)
+### 4. 👤 用户画像系统
 沉淀对话记忆，构建越用越懂你的专属知识图谱：
+- **深度偏好挖掘**: 结合 LLM 语义分析与 NetworkX 图算法（PageRank），量化提取用户关注的核心实体与关系
+- **无感异步更新**: 采用 Fire-and-Forget 机制，在会话结束时通过后台线程池静默更新画像，零延迟不阻塞对话
+- **动态侧写生成**: 实时将挖掘结果转化为结构化标签与自然语言摘要，持久化至 `data/person_like.json` 供前端可视化展示
+- **个性化响应**: Agent 自动结合用户画像调整回答风格和内容侧重点
 
-- **深度偏好挖掘**: 结合 LLM 语义分析与 NetworkX 图算法 (PageRank)，量化提取用户关注的核心实体与关系。
-
-- **无感异步更新**: 采用 Fire-and-Forget 机制，在会话结束时通过后台线程池静默更新画像，零延迟不阻塞对话。
-
-- **动态侧写生成**: 实时将挖掘结果转化为结构化标签与自然语言摘要，持久化至 data/person_like.json 供前端可视化展示。
-
-## 📂 项目架构
-
-```text
-AgentForce/
-├── config/                  # [控制中心]
-│   ├── __init__.py
-│   ├── prompts.py           # Agent 提示词工程
-│   ├── saved_config.json    # [自动同步] 系统配置存储
-│   ├── saved_history.json   # [自动同步] 对话记忆存储
-│   └── settings.py          # 全局配置加载器
-├── src/                     # [核心引擎]
-│   ├── api/                 # 接口层 (RESTful API & WebSocket)
-│   ├── models/              # 数据模型 (Pydantic Schema)
-│   ├── services/            # 业务服务 (LLM, GraphRAG, Search)
-│   └── workflow/            # 代理大脑 (Agent Nodes & Edges)
-├── static/                  # [交互界面] 轻量级 Web UI
-│   ├── chat.js              # 对话交互逻辑
-│   ├── config.js            # 动态配置逻辑
-│   ├── knowledge.js         # 知识库可视化逻辑
-│   └── index.html           # 应用入口
-├── uploads/                 # [数据缓存] 待处理文件区
-├── requirements.txt         # 依赖清单
-├── run.py                   # 服务启动入口
-└── README.md                # 说明文档
-
-```
+### 5. 💬 WebSocket 实时交互
+现代化的流式对话体验：
+- **双向实时通信**: 基于 WebSocket 的低延迟消息传输
+- **思考过程可视化**: 实时展示 Agent 的推理步骤和工具调用状态
+  - 🚀 开始思考
+  - 🛠️ 调用工具
+  - ✨ 执行完成
+  - 🎉 流程结束
+- **历史会话管理**: 侧边栏自动加载和恢复历史对话，支持会话切换
+- **会话隔离**: 每个 WebSocket 连接独立的 Session，支持多用户并发
 
 ---
 
@@ -82,7 +73,7 @@ AgentForce/
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/TW-NLP/AgentForce
+git clone https://github.com/TW-NLP/DeepAgentForce
 cd AgentForce
 
 # 2. 环境的准备
@@ -100,7 +91,7 @@ pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --tru
 
 ```
 
-### 2. 启动 AgentForce
+### 2. 启动 DeepAgentForce
 
 系统由后端 API 和前端 UI 两部分组成。
 

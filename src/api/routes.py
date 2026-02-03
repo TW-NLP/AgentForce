@@ -30,7 +30,6 @@ except ImportError:
     logging.warning("GraphRAG 模块未找到，相关功能将不可用")
 
 from src.api.websocket import ConversationHistoryManager
-from src.workflow.agent import ConversationalAgent
 
 logger = logging.getLogger(__name__)
 

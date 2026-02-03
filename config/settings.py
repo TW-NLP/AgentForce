@@ -16,10 +16,35 @@ class Settings(BaseSettings):
     """应用配置"""
 
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).parent.parent
-    
+    # model config
     CONFIG_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "saved_config.json"
+    # history files
     HISTORY_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "history"
+    # user profile file
     PERSON_LIKE_FILE: ClassVar[Path] = PROJECT_ROOT / "data" / "person_like.json"
+    # services directory
+    SERVICE_DIR: ClassVar[Path] = PROJECT_ROOT / "src" / "services"
+
+    @property
+    def config_hash(self) -> str:
+        """
+        生成关键配置的指纹 (Hash)
+        用于检测配置是否发生变化
+        """
+        # 1. 拼接所有影响 Agent 运行的关键字段
+        # 注意：这里只包含那些"改了就需要重启模型"的字段
+        # 像 LOG_LEVEL 这种改了不需要重启模型的，就不要加进来
+        key_content = (
+            f"{self.LLM_API_KEY}|"
+            f"{self.LLM_MODEL}|"
+            f"{self.LLM_URL}|"
+            f"{self.TAVILY_API_KEY}|"
+            f"{self.FIRECRAWL_API_KEY}|"
+            f"{self.EMBEDDING_API_KEY}|"
+            f"{self.EMBEDDING_MODEL}|"
+        )
+
+        return str(hash(key_content))
 
     @classmethod
     def ensure_data_dir(cls):
@@ -54,7 +79,6 @@ class Settings(BaseSettings):
 
 
 
-    
     # ==================== 应用基础配置 ====================
     APP_NAME: str = "IntelligentSearchAssistant"
     APP_VERSION: str = "2.0.0"
@@ -221,24 +245,6 @@ def get_settings() -> Settings:
 # 导出配置实例
 settings = get_settings()
 settings.initialize()
-
-
-# ==================== 配置验证 ====================
-def validate_settings():
-    """验证关键配置项"""
-    errors = []
-    
-    if not settings.LLM_API_KEY:
-        errors.append("LLM_API_KEY 未配置")
-    
-    if not settings.TAVILY_API_KEY:
-        errors.append("TAVILY_API_KEY 未配置")
-
-    
-    if errors:
-        raise ValueError(f"配置验证失败:\n" + "\n".join(f"  - {e}" for e in errors))
-    
-    return True
 
 
 # ==================== 配置工具函数 ====================

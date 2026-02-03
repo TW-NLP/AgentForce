@@ -10,59 +10,8 @@ from typing import Callable, Dict, Any, List
 logger = logging.getLogger(__name__)
 
 
-class StatusCallback:
-    """状态回调管理器"""
-    
-    def __init__(self):
-        self.callbacks: List[Callable] = []
-    
-    def add_callback(self, callback: Callable):
-        """
-        添加回调函数
-        
-        Args:
-            callback: 回调函数，接受 (event_type: str, data: Dict[str, Any]) 参数
-        """
-        self.callbacks.append(callback)
-        logger.debug(f"添加回调函数，当前共 {len(self.callbacks)} 个")
-    
-    def remove_callback(self, callback: Callable):
-        """
-        移除回调函数
-        
-        Args:
-            callback: 要移除的回调函数
-        """
-        if callback in self.callbacks:
-            self.callbacks.remove(callback)
-            logger.debug(f"移除回调函数，当前剩余 {len(self.callbacks)} 个")
-    
-    async def emit(self, event_type: str, data: Dict[str, Any]):
-        """
-        触发所有回调
-        
-        Args:
-            event_type: 事件类型 (step/token/progress/error/llm_start/llm_end)
-            data: 事件数据
-        """
-        for callback in self.callbacks:
-            try:
-                if asyncio.iscoroutinefunction(callback):
-                    await callback(event_type, data)
-                else:
-                    callback(event_type, data)
-            except Exception as e:
-                logger.error(f"回调执行错误: {e}", exc_info=True)
-    
-    def clear(self):
-        """清空所有回调"""
-        self.callbacks.clear()
-        logger.debug("已清空所有回调函数")
-
-
 class EventType:
     """事件类型常量"""
-    
     # 工作流步骤事件
     STEP = "step"
     
@@ -87,14 +36,6 @@ class StepEvent:
     
     @staticmethod
     def create(step: str, title: str, description: str) -> Dict[str, Any]:
-        """
-        创建步骤事件
-        
-        Args:
-            step: 步骤标识
-            title: 步骤标题
-            description: 步骤描述
-        """
         return {
             "step": step,
             "title": title,
@@ -104,70 +45,88 @@ class StepEvent:
 
 class TokenEvent:
     """Token 事件数据结构"""
-    
     @staticmethod
     def create(content: str, full_message: str = "") -> Dict[str, Any]:
-        """
-        创建 Token 事件
-        
-        Args:
-            content: 新生成的 token
-            full_message: 完整消息
-        """
         return {
             "content": content,
             "full_message": full_message
         }
 
 
-class ProgressEvent:
-    """进度事件数据结构"""
+class StatusCallback:
+    """状态回调管理器"""
     
-    @staticmethod
-    def create(current: int, total: int, description: str = "") -> Dict[str, Any]:
-        """
-        创建进度事件
-        
-        Args:
-            current: 当前进度
-            total: 总数
-            description: 描述
-        """
-        return {
-            "current": current,
-            "total": total,
-            "description": description
-        }
-
-
-class ErrorEvent:
-    """错误事件数据结构"""
+    def __init__(self):
+        self.callbacks: List[Callable] = []
     
-    @staticmethod
-    def create(message: str, step: str = "", details: str = "") -> Dict[str, Any]:
-        """
-        创建错误事件
+    def add_callback(self, callback: Callable):
+        """添加回调函数"""
+        self.callbacks.append(callback)
+    
+    def remove_callback(self, callback: Callable):
+        """移除回调函数"""
+        if callback in self.callbacks:
+            self.callbacks.remove(callback)
+    
+    async def emit(self, event_type: str, data: Dict[str, Any]):
+        """触发所有回调 (核心分发逻辑)"""
+        for callback in self.callbacks:
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(event_type, data)
+                else:
+                    callback(event_type, data)
+            except Exception as e:
+                logger.error(f"回调执行错误: {e}", exc_info=True)
+
+    # =================================================================
+    # ✅ 新增：适配 Agent 生命周期的专用方法
+    # 这些方法将 Agent 的行为转换为前端能理解的 "StepEvent"
+    # =================================================================
+
+    async def on_agent_start(self, data: Dict[str, Any]):
+        """当 Agent 开始处理任务时调用"""
+        await self.emit(EventType.STEP, StepEvent.create(
+            step="init",
+            title="开始思考",
+            description=f"收到任务: {data.get('input', '')[:50]}..."
+        ))
+
+    async def on_tool_start(self, data: Dict[str, Any]):
+        """当 Agent 决定调用工具时调用"""
+        tool_name = data.get("name", "Unknown Tool")
+        args = data.get("args", {})
         
-        Args:
-            message: 错误信息
-            step: 出错的步骤
-            details: 详细信息
-        """
-        return {
-            "message": message,
-            "step": step,
-            "details": details
-        }
+        await self.emit(EventType.STEP, StepEvent.create(
+            step="tool_start",
+            title=f"调用工具: {tool_name}",
+            description=f"参数: {str(args)[:100]}..."
+        ))
 
+    async def on_tool_end(self, data: Dict[str, Any]):
+        """当工具执行完毕返回结果时调用"""
+        output = data.get("output", "")
+        
+        await self.emit(EventType.STEP, StepEvent.create(
+            step="tool_end",
+            title="工具执行完成",
+            description=f"结果预览: {str(output)[:100]}..."
+        ))
 
-# 创建默认的日志回调
-async def default_logging_callback(event_type: str, data: Dict[str, Any]):
-    """默认的日志回调"""
-    if event_type == EventType.STEP:
-        logger.info(f"[{data.get('step')}] {data.get('title')}: {data.get('description')}")
-    elif event_type == EventType.ERROR:
-        logger.error(f"错误: {data.get('message')}")
-    elif event_type == EventType.WARNING:
-        logger.warning(f"警告: {data.get('message')}")
-    elif event_type == EventType.PROGRESS:
-        logger.info(f"进度: {data.get('current')}/{data.get('total')}")
+    async def on_agent_finish(self, data: Dict[str, Any]):
+        """当 Agent 完成所有步骤准备回答时调用"""
+        await self.emit(EventType.STEP, StepEvent.create(
+            step="finish",
+            title="流程结束",
+            description="任务已完成，正在生成最终回复"
+        ))
+        
+    async def on_llm_new_token(self, token: str):
+        """(可选) 如果需要流式输出 Token"""
+        await self.emit(EventType.TOKEN, TokenEvent.create(
+            content=token
+        ))
+
+    def clear(self):
+        """清空所有回调"""
+        self.callbacks.clear()

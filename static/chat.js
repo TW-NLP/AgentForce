@@ -30,7 +30,7 @@ const statusText = document.getElementById('statusText');
 async function loadSavedHistory() {
     try {
         console.log("正在加载历史记录...");
-        const response = await fetch(`${API_URL}/history/saved`);
+        const response = await fetch(`${API_URL}/history/saved`);  // ← 修复这里
         
         if (!response.ok) {
             console.warn("无法连接到历史记录接口");
@@ -44,9 +44,9 @@ async function loadSavedHistory() {
             historyList.innerHTML = '';
         }
 
-        // ★★★ 适配新的数据结构：sessions ★★★
+        // 适配新的数据结构：sessions
         if (data.success && Array.isArray(data.sessions) && data.sessions.length > 0) {
-            // 按更新时间倒序排列，最新的显示在最上面
+            // 按更新时间倒序排列
             const sortedSessions = [...data.sessions].sort((a, b) => 
                 new Date(b.updated_at) - new Date(a.updated_at)
             );
@@ -55,10 +55,8 @@ async function loadSavedHistory() {
                 const li = document.createElement('li');
                 li.className = 'history-item';
                 
-                // 使用 session 的 title，如果没有则用第一条对话的内容
                 let title = session.title || '新对话';
                 
-                // 如果 title 是 "新对话" 且有对话内容，用第一条用户消息作为标题
                 if (title === '新对话' && session.conversation && session.conversation.length > 0) {
                     const firstMsg = session.conversation[0].user_content;
                     if (firstMsg) {
@@ -70,7 +68,6 @@ async function loadSavedHistory() {
                 
                 li.textContent = title;
                 
-                // 显示对话数量和时间
                 const conversationInfo = document.createElement('span');
                 conversationInfo.className = 'conversation-info';
                 conversationInfo.textContent = ` (${session.conversation_count}条)`;
@@ -78,16 +75,12 @@ async function loadSavedHistory() {
                 conversationInfo.style.color = '#999';
                 li.appendChild(conversationInfo);
                 
-                // 完整标题作为 tooltip
                 li.title = `${title}\n对话数: ${session.conversation_count}\n时间: ${new Date(session.updated_at).toLocaleString('zh-CN')}`;
-                
-                // 点击事件：恢复整个 session 的对话
                 li.onclick = () => restoreSession(session);
                 
                 historyList.appendChild(li);
             });
         } else {
-            // 没有历史记录时显示提示
             const emptyTip = document.createElement('li');
             emptyTip.className = 'history-empty';
             emptyTip.textContent = '暂无历史记录';
@@ -100,7 +93,6 @@ async function loadSavedHistory() {
         console.error("加载历史记录失败:", error);
     }
 }
-
 /**
  * 恢复显示某一段历史对话
  */
@@ -204,6 +196,8 @@ function updateStatus(connected) {
 }
 
 function handleWebSocketMessage(data) {
+    console.log('📨 收到 WebSocket 消息:', data);
+    
     switch (data.type) {
         case 'step':
             handleStepUpdate(data);
@@ -212,7 +206,8 @@ function handleWebSocketMessage(data) {
             handleTokenUpdate(data.content);
             break;
         case 'done':
-            handleDone();
+            console.log('✅ 收到 done 事件，消息内容:', data.message);
+            handleDone(data.message);  // ← 修改这里
             break;
         case 'error':
             handleError(data.message);
@@ -220,6 +215,29 @@ function handleWebSocketMessage(data) {
     }
 }
 
+function handleDone(finalMessage = null) {  // ← 修改这里
+    console.log('✅ handleDone 被调用，收到消息:', finalMessage);
+    
+    // 如果有最终消息，且没有创建流式回答框，就直接添加消息
+    if (finalMessage && !currentStreamingAnswer) {
+        addMessage('assistant', finalMessage);
+    }
+    
+    if (currentStreamingAnswer) {
+        const contentDiv = currentStreamingAnswer.querySelector('.message-content');
+        contentDiv.classList.remove('streaming');
+    }
+    
+    currentThinkingContainer = null;
+    currentStreamingAnswer = null;
+    isProcessing = false;
+    
+    if (sendButton) sendButton.disabled = false;
+    if (messageInput) messageInput.disabled = false;
+    if (messageInput) messageInput.focus();
+    
+    loadSavedHistory();
+}
 // ============ 3. 消息渲染与流式处理 ============
 
 function hideWelcomeScreen() {
@@ -310,11 +328,22 @@ function handleStepUpdate(data) {
 
 function getStepIcon(step) {
     const s = step.toLowerCase();
-    if (s.includes('search')) return '🔍';
-    if (s.includes('doc')) return '📚';
-    if (s.includes('plan')) return '🤔';
-    if (s.includes('chat')) return '💬';
-    return '⚙️';
+    
+    // 根据新的步骤类型匹配图标
+    if (s.includes('init') || s.includes('开始')) return '🤔';
+    if (s.includes('tool_start') || s.includes('调用工具')) return '🔧';
+    if (s.includes('tool_end') || s.includes('执行完成')) return '✅';
+    if (s.includes('finish') || s.includes('结束')) return '🎯';
+    
+    // 其他可能的步骤类型
+    if (s.includes('search') || s.includes('搜索')) return '🔍';
+    if (s.includes('doc') || s.includes('文档')) return '📚';
+    if (s.includes('plan') || s.includes('规划')) return '📋';
+    if (s.includes('chat') || s.includes('对话')) return '💬';
+    if (s.includes('error') || s.includes('错误')) return '❌';
+    if (s.includes('warning') || s.includes('警告')) return '⚠️';
+    
+    return '⚙️';  // 默认图标
 }
 
 function getStepClass(step) {
@@ -360,25 +389,6 @@ function handleTokenUpdate(token) {
     scrollToBottom();
 }
 
-// 处理完成 (Done)
-function handleDone() {
-    if (currentStreamingAnswer) {
-        const contentDiv = currentStreamingAnswer.querySelector('.message-content');
-        contentDiv.classList.remove('streaming');
-    }
-    
-    currentThinkingContainer = null;
-    currentStreamingAnswer = null;
-    isProcessing = false;
-    
-    // 恢复输入框
-    if (sendButton) sendButton.disabled = false;
-    if (messageInput) messageInput.disabled = false;
-    if (messageInput) messageInput.focus();
-
-    // ★★★ 对话结束后，重新加载历史记录，确保刚才的对话出现在侧边栏 ★★★
-    loadSavedHistory();
-}
 
 // 处理错误 (Error)
 function handleError(msg) {

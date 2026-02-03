@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from config.settings import settings, validate_settings
+from config.settings import settings
 from src.api.routes import router as api_router
 from src.api.websocket import setup_websocket_routes
 

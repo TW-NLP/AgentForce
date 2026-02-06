@@ -5,6 +5,17 @@
 [![DeepAgents](https://img.shields.io/badge/DeepAgents-latest-orange)](https://github.com/deepagents/deepagents)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
+<div align="center">
+  <a href="https://github.com/TW-NLP/DeepAgentForce">
+    <img src="images/logo.png" alt="Logo" height="156">
+  </a>
+</div>
+
+
+
+-----------------
+
+
 DeepAgentForce 是一个基于 DeepAgents 框架构建的闭环智能体协同系统。它不仅具备传统 RAG 的知识检索能力，更通过 动态 Skill 注入 和 用户偏好深度挖掘 (Persona Mining)，实现了“越用越懂你”的个性化执行体验。
 
 ---
